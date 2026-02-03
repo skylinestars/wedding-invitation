@@ -1,28 +1,152 @@
 // 婚礼请柬主交互脚本
 
+// 预加载资源
+function preloadResources() {
+  return new Promise((resolve) => {
+    // 需要预加载的资源列表
+    const resources = [
+
+      './assets/images/background.webp',
+      './assets/images/top.webp',
+      './assets/images/bottom_left.webp',
+      './assets/images/bottom_right.webp',
+      './assets/images/lantern.png',
+      './assets/images/map.png',
+      './assets/images/ogImg.jpg',
+      './assets/images/person_background.webp',
+
+      './assets/images/r1.jpg',
+      './assets/images/r2.jpg',
+      './assets/images/r5.jpg',
+      './assets/images/top.webp',
+
+      // 音乐文件
+      './assets/music/zmjhb.mp3'
+    ];
+    
+    const totalResources = resources.length;
+    let loadedResources = 0;
+    
+    const loadingProgressBar = document.getElementById('loadingProgressBar');
+    const loadingTip = document.getElementById('loadingTip');
+    
+    // 更新加载进度
+    function updateProgress() {
+      const progress = (loadedResources / totalResources) * 100;
+      if (loadingProgressBar) {
+        loadingProgressBar.style.width = `${progress}%`;
+      }
+      
+      if (loadingTip) {
+        loadingTip.textContent = `正在加载资源 ${loadedResources}/${totalResources}...`;
+      }
+      
+      console.log(`资源加载进度: ${Math.round(progress)}%`);
+      
+      if (loadedResources >= totalResources) {
+        console.log('🎉 所有资源加载完成');
+        resolve();
+      }
+    }
+    
+    // 加载单个资源
+    function loadResource(url) {
+      if (url.endsWith('.mp3') || url.endsWith('.wav') || url.endsWith('.ogg')) {
+        // 加载音频
+        const audio = new Audio();
+        audio.src = url;
+        audio.addEventListener('loadeddata', function() {
+          loadedResources++;
+          updateProgress();
+        });
+        audio.addEventListener('error', function() {
+          console.warn(`音频加载失败: ${url}`);
+          loadedResources++;
+          updateProgress();
+        });
+      } else {
+        // 加载图片
+        const img = new Image();
+        img.src = url;
+        img.addEventListener('load', function() {
+          loadedResources++;
+          updateProgress();
+        });
+        img.addEventListener('error', function() {
+          console.warn(`图片加载失败: ${url}`);
+          loadedResources++;
+          updateProgress();
+        });
+      }
+    }
+    
+    // 开始加载所有资源
+    resources.forEach(loadResource);
+    
+    // 防止资源加载超时
+    setTimeout(() => {
+      if (loadedResources < totalResources) {
+        console.warn('⚠️ 资源加载超时，继续初始化');
+        resolve();
+      }
+    }, 10000); // 10秒超时
+  });
+}
+
+// 隐藏加载页面
+function hideLoadingPage() {
+  const loadingPage = document.getElementById('loadingPage');
+  if (loadingPage) {
+    loadingPage.classList.add('hidden');
+    // 延迟后完全移除加载页面
+    setTimeout(() => {
+      loadingPage.style.display = 'none';
+    }, 1000);
+  }
+}
+
+
 // ========== 等待 DOM 加载完成 ==========
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+  console.log('开始预加载资源...');
   
-  // ========== 初始化配置 ==========
-  initializeConfig();
-  
-  // ========== 初始化 Swiper ==========
-  initializeSwiper();
-  
-  // ========== 初始化音乐控制 ==========
-  initializeMusicControl();
-  
-  // ========== 初始化地图导航 ==========
-  initializeMapNavigation();
-  
-  // ========== 初始化祝福语功能 ==========
-  initializeBlessingSystem();
-  
-  // ========== 初始化主题切换 ==========
-  initializeThemeSwitcher();
-  
-  // ========== 初始化微信分享（如果需要） ==========
-  // initializeWeChatShare(); // 需要后端支持
+  try {
+    // 预加载资源
+    await preloadResources();
+    
+    // 隐藏加载页面
+    hideLoadingPage();
+    
+    // ========== 初始化配置 ==========
+    initializeConfig();
+    
+    // ========== 初始化 Swiper ==========
+    initializeSwiper();
+    
+    // ========== 初始化音乐控制 ==========
+    initializeMusicControl();
+    
+    // ========== 初始化地图导航 ==========
+    initializeMapNavigation();
+    
+    // ========== 初始化祝福语功能 ==========
+    initializeBlessingSystem();
+    
+    // ========== 初始化主题切换 ==========
+    initializeThemeSwitcher();
+    
+    // ========== 初始化微信分享（如果需要） ==========
+    // initializeWeChatShare(); // 需要后端支持
+    
+    console.log('✅ 所有功能初始化完成');
+  } catch (error) {
+    console.error('初始化失败:', error);
+    // 即使出错也显示页面
+    hideLoadingPage();
+    // 尝试初始化核心功能
+    initializeConfig();
+    initializeSwiper();
+  }
 });
 
 // ========== 初始化配置信息 ==========
