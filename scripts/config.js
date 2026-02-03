@@ -26,11 +26,11 @@ const weddingConfig = {
   
 
   // ========== 音乐配置 ==========
-  music: {
-    src: './assets/music/zmjhb.mp3',  // 背景音乐路径
-    autoplay: true,                  // 是否自动播放（注意：某些浏览器需要用户交互后才能播放）
-    loop: true                       // 是否循环播放
-  },
+  // music: {
+  //   src: './assets/music/zmjhb.mp3',  // 背景音乐路径
+  //   autoplay: true,                  // 是否自动播放（注意：某些浏览器需要用户交互后才能播放）
+  //   loop: true                       // 是否循环播放
+  // },
   
   // ========== Open Graph 配置（用于微信朋友圈分享） ==========
   og: {

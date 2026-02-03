@@ -50,35 +50,41 @@ function preloadResources() {
     }
     
     // 加载单个资源
-    function loadResource(url) {
-      if (url.endsWith('.mp3') || url.endsWith('.wav') || url.endsWith('.ogg')) {
-        // 加载音频
-        const audio = new Audio();
-        audio.src = url;
-        audio.addEventListener('loadeddata', function() {
+  function loadResource(url) {
+    if (url.endsWith('.mp3') || url.endsWith('.wav') || url.endsWith('.ogg')) {
+      // 使用fetch + Blob方式预加载音频（工业级方案）
+      fetch(url)
+        .then(res => res.blob())
+        .then(blob => {
+          const objectURL = URL.createObjectURL(blob);
+          const bgMusic = document.getElementById('bgMusic');
+          if (bgMusic) {
+            bgMusic.src = objectURL;
+            console.log('✅ 音乐文件通过fetch完全预加载成功:', url);
+          }
+          loadedResources++;
+          updateProgress();
+        })
+        .catch(error => {
+          console.warn(`音频加载失败: ${url}`, error);
           loadedResources++;
           updateProgress();
         });
-        audio.addEventListener('error', function() {
-          console.warn(`音频加载失败: ${url}`);
-          loadedResources++;
-          updateProgress();
-        });
-      } else {
-        // 加载图片
-        const img = new Image();
-        img.src = url;
-        img.addEventListener('load', function() {
-          loadedResources++;
-          updateProgress();
-        });
-        img.addEventListener('error', function() {
-          console.warn(`图片加载失败: ${url}`);
-          loadedResources++;
-          updateProgress();
-        });
-      }
+    } else {
+      // 加载图片
+      const img = new Image();
+      img.src = url;
+      img.addEventListener('load', function() {
+        loadedResources++;
+        updateProgress();
+      });
+      img.addEventListener('error', function() {
+        console.warn(`图片加载失败: ${url}`);
+        loadedResources++;
+        updateProgress();
+      });
     }
+  }
     
     // 开始加载所有资源
     resources.forEach(loadResource);
@@ -288,7 +294,7 @@ function initializeMusicControl() {
   // 尝试自动播放（某些浏览器需要用户交互）
   if (weddingConfig && weddingConfig.music && weddingConfig.music.autoplay) {
     setTimeout(() => {
-      playMusic();
+      tryPlayMusic();
     }, 500);
   }
   
@@ -303,25 +309,44 @@ function initializeMusicControl() {
     }
   });
   
-  // 页面首次点击时尝试播放（解决浏览器限制）
-  const tryAutoPlay = function() {
+  // 页面首次交互时尝试播放（解决浏览器限制）
+  const handleUserInteraction = function() {
     if (!hasInteracted && !isPlaying) {
       hasInteracted = true;
       playMusic();
       // 移除监听器
-      document.body.removeEventListener('click', tryAutoPlay);
-      document.body.removeEventListener('touchstart', tryAutoPlay);
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
     }
   };
   
-  document.body.addEventListener('click', tryAutoPlay);
-  document.body.addEventListener('touchstart', tryAutoPlay);
+  // 添加多种交互事件监听器
+  document.addEventListener('click', handleUserInteraction);
+  document.addEventListener('touchstart', handleUserInteraction);
+  document.addEventListener('keydown', handleUserInteraction);
+  
+  // 尝试播放音乐（不强制重新加载）
+  function tryPlayMusic() {
+    if (bgMusic.paused) {
+      bgMusic.play()
+        .then(() => {
+          isPlaying = true;
+          musicControl.querySelector('.music-icon').classList.add('playing');
+          console.log('🎵 音乐开始播放');
+        })
+        .catch(error => {
+          console.log('自动播放被阻止，等待用户交互:', error);
+          isPlaying = false;
+          musicControl.querySelector('.music-icon').classList.remove('playing');
+          // 不做特殊处理，等待用户点击
+        });
+    }
+  }
   
   // 播放音乐
   function playMusic() {
-    // 先加载音乐
-    bgMusic.load();
-    
+    // 直接播放，不重新加载（避免额外的网络请求）
     bgMusic.play()
       .then(() => {
         isPlaying = true;
@@ -329,7 +354,7 @@ function initializeMusicControl() {
         console.log('🎵 音乐开始播放');
       })
       .catch(error => {
-        console.warn('⚠️ 音乐自动播放被阻止，需要用户交互:', error);
+        console.warn('⚠️ 音乐播放失败:', error);
         isPlaying = false;
         musicControl.querySelector('.music-icon').classList.remove('playing');
         
