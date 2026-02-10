@@ -52,24 +52,34 @@ function preloadResources() {
     // 加载单个资源
   function loadResource(url) {
     if (url.endsWith('.mp3') || url.endsWith('.wav') || url.endsWith('.ogg')) {
-      // 使用fetch + Blob方式预加载音频（工业级方案）
-      fetch(url)
-        .then(res => res.blob())
-        .then(blob => {
-          const objectURL = URL.createObjectURL(blob);
-          const bgMusic = document.getElementById('bgMusic');
-          if (bgMusic) {
-            bgMusic.src = objectURL;
-            console.log('✅ 音乐文件通过fetch完全预加载成功:', url);
-          }
+      // 使用 Audio 元素预加载音频（避免 CORS 问题）
+      const bgMusic = document.getElementById('bgMusic');
+      if (bgMusic) {
+        const onCanPlay = function() {
+          bgMusic.removeEventListener('canplaythrough', onCanPlay);
+          console.log('✅ 音乐文件预加载成功:', url);
           loadedResources++;
           updateProgress();
-        })
-        .catch(error => {
-          console.warn(`音频加载失败: ${url}`, error);
+        };
+        const onError = function() {
+          bgMusic.removeEventListener('error', onError);
+          console.warn(`音频加载失败: ${url}`);
           loadedResources++;
           updateProgress();
-        });
+        };
+        // 如果已经可以播放，直接计数
+        if (bgMusic.readyState >= 4) {
+          console.log('✅ 音乐文件已就绪:', url);
+          loadedResources++;
+          updateProgress();
+        } else {
+          bgMusic.addEventListener('canplaythrough', onCanPlay);
+          bgMusic.addEventListener('error', onError);
+        }
+      } else {
+        loadedResources++;
+        updateProgress();
+      }
     } else {
       // 加载图片
       const img = new Image();
@@ -169,10 +179,12 @@ function initializeConfig() {
   if (brideNameEl) brideNameEl.textContent = weddingConfig.bride;
   
   // 填充婚礼日期
-  const weddingDateEl = document.getElementById('weddingDate');
-  const weddingWeekdayEl = document.getElementById('weddingWeekday');
-  if (weddingDateEl) weddingDateEl.textContent = weddingConfig.date;
-  if (weddingWeekdayEl) weddingWeekdayEl.textContent = weddingConfig.weekday;
+  const weddingDateEl = document.getElementById('weddingDateTime');
+  if (weddingDateEl)
+  {
+    weddingDateEl.textContent = `${weddingConfig.date} ${weddingConfig.time}`;
+  }
+
   
   // 填充邀请函页面信息（第2页）
   const invitationDateTimeEl = document.getElementById('invitationDateTime');
@@ -431,6 +443,15 @@ function initializeMapNavigation() {
     });
   }
   
+  // 地图图片点击也触发导航
+  const mapDiv = document.getElementById('map');
+  if (mapDiv) {
+    mapDiv.style.cursor = 'pointer';
+    mapDiv.addEventListener('click', function() {
+      openMapNavigation(lat, lng, name);
+    });
+  }
+  
   // 复制地址
   if (copyAddressButton) {
     copyAddressButton.addEventListener('click', function() {
@@ -441,27 +462,74 @@ function initializeMapNavigation() {
 
 // 打开地图导航
 function openMapNavigation(lat, lng, name) {
-  // 检测是否在微信中
-  const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
-  
   // 编码地址名称
   const encodedName = encodeURIComponent(name);
   
-  if (isWeChat) {
-    // 微信中优先使用腾讯地图
-    const url = `https://apis.map.qq.com/uri/v1/marker?marker=coord:${lat},${lng};title:${encodedName}&referer=wedding`;
-    window.location.href = url;
-  } else {
-    // 其他环境，提供多种选择
-    const confirmMsg = '选择导航方式：\n确定 - 腾讯地图\n取消 - 百度地图';
-    if (confirm(confirmMsg)) {
-      // 腾讯地图
-      window.open(`https://apis.map.qq.com/uri/v1/marker?marker=coord:${lat},${lng};title:${encodedName}&referer=wedding`);
-    } else {
-      // 百度地图
-      window.open(`https://api.map.baidu.com/marker?location=${lat},${lng}&title=${encodedName}&content=${encodedName}&output=html`);
-    }
-  }
+  // 地图链接
+  const mapUrls = {
+    tencent: `https://apis.map.qq.com/uri/v1/marker?marker=coord:${lat},${lng};title:${encodedName}&referer=wedding`,
+    baidu: `https://api.map.baidu.com/marker?location=${lat},${lng}&title=${encodedName}&content=${encodedName}&output=html`,
+    amap: `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodedName}&src=wedding`
+  };
+  
+  // 创建自定义选择弹窗（包括微信环境）
+  showMapSelector(mapUrls);
+}
+
+// 显示地图选择弹窗
+function showMapSelector(mapUrls) {
+  // 移除已有弹窗
+  const existing = document.getElementById('mapSelectorOverlay');
+  if (existing) existing.remove();
+  
+  // 创建遮罩层
+  const overlay = document.createElement('div');
+  overlay.id = 'mapSelectorOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;justify-content:center;align-items:center;';
+  
+  // 创建弹窗
+  const dialog = document.createElement('div');
+  dialog.style.cssText = 'background:#fff;border-radius:12px;padding:24px 20px 16px;width:280px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+  
+  const title = document.createElement('div');
+  title.textContent = '选择导航方式';
+  title.style.cssText = 'font-size:17px;font-weight:bold;color:#333;margin-bottom:18px;';
+  dialog.appendChild(title);
+  
+  const maps = [
+    { label: '腾讯地图', url: mapUrls.tencent, color: '#07C160' },
+    { label: '百度地图', url: mapUrls.baidu, color: '#3385FF' },
+    { label: '高德地图', url: mapUrls.amap, color: '#1E90FF' }
+  ];
+  
+  maps.forEach(function(item) {
+    const btn = document.createElement('button');
+    btn.textContent = item.label;
+    btn.style.cssText = 'display:block;width:100%;padding:12px 0;margin-bottom:10px;border:none;border-radius:8px;font-size:16px;color:#fff;cursor:pointer;background:' + item.color + ';';
+    btn.addEventListener('click', function() {
+      overlay.remove();
+      window.open(item.url);
+    });
+    dialog.appendChild(btn);
+  });
+  
+  // 取消按钮
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = '取消';
+  cancelBtn.style.cssText = 'display:block;width:100%;padding:12px 0;border:none;border-radius:8px;font-size:16px;color:#666;cursor:pointer;background:#f5f5f5;margin-top:4px;';
+  cancelBtn.addEventListener('click', function() {
+    overlay.remove();
+  });
+  dialog.appendChild(cancelBtn);
+  
+  overlay.appendChild(dialog);
+  
+  // 点击遮罩关闭
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+  
+  document.body.appendChild(overlay);
 }
 
 // 复制到剪贴板
@@ -513,22 +581,7 @@ function initializeThemeSwitcher() {
 
 // 应用主题
 function applyTheme(theme) {
-  const themeStylesheet = document.getElementById('theme-stylesheet');
-  if (!themeStylesheet) {
-    console.error('主题样式表元素未找到');
-    return;
-  }
-  
-  const themeMap = {
-    'classic': './styles/theme-classic.css',
-    'modern': './styles/theme-modern.css',
-    'fresh': './styles/theme-fresh.css'
-  };
-  
-  const themePath = themeMap[theme] || themeMap['classic'];
-  themeStylesheet.href = themePath;
-  
-  console.log('应用主题:', theme);
+
 }
 
 // ========== 初始化微信分享（需要后端支持获取签名） ==========
