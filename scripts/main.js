@@ -12,11 +12,11 @@ function preloadResources() {
       './assets/images/bottom_right.webp',
       './assets/images/lantern.png',
       './assets/images/map.png',
-      './assets/images/ogImg.jpg',
+
       './assets/images/person_background.webp',
 
-      './assets/images/r1.jpg',
-      './assets/images/r2.jpg',
+      './assets/images/r8.jpg',
+      './assets/images/r7.jpeg',
       './assets/images/r5.jpg',
       './assets/images/top.webp',
 
@@ -690,34 +690,99 @@ function initializeBlessingSystem() {
     return;
   }
   
-  // 示例祝福语
+  // 预设祝福语（让页面更热闹）
   const defaultBlessings = [
-    '百年好合，永结同心',
-    '早生贵子，幸福美满',
-    '执子之手，与子偕老',
-    '珠联璧合，佳偶天成',
-    '天作之合，鸾凤和鸣',
-    '花好月圆，百年琴瑟',
-    '美满良缘，白首成约',
-    '恩爱有加，相敬如宾'
+    // '百年好合，永结同心',
+    // '早生贵子，幸福美满',
+    // '执子之手，与子偕老',
+    // '珠联璧合，佳偶天成',
+    // '天作之合，鸾凤和鸣',
+    // '花好月圆，百年琴瑟',
+    // '美满良缘，白首成约',
+    // '恩爱有加，相敬如宾',
+    // '新婚快乐，甜甜蜜蜜',
+    // '举案齐眉，琴瑟和谐',
+    // '龙凤呈祥，喜结连理',
+    // '永浴爱河，白头偕老',
+    // '情投意合，幸福一生',
+    // '相濡以沫，恩爱百年',
+    '郎才女貌，天赐良缘',
+    '比翼双飞，海枯石烂',
+    '祝福王路和张小芳新婚快乐！',
+    '愿你们的爱情甜如蜜糖',
+    '最美好的祝福送给最幸福的你们',
+    '愿你们携手共度每一个春夏秋冬'
   ];
   
-  // 存储所有祝福语
+  // API 地址
+  const API_URL = (weddingConfig && weddingConfig.blessingApi) || '';
+  
+  // 存储所有祝福语（预设 + 云端）
   let blessings = [...defaultBlessings];
   
-  // 初始化默认弹幕（分散显示）
-  defaultBlessings.forEach((blessing, index) => {
-    setTimeout(() => {
-      createDanmaku(blessing);
-    }, index * 1500); // 增加延迟时间，确保弹幕分散显示
+  // 从云端加载祝福语
+  async function loadCloudBlessings() {
+    if (!API_URL) {
+      console.warn('祝福语API未配置，仅使用预设祝福语');
+      return;
+    }
+    try {
+      const response = await fetch(API_URL);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data && result.data.length > 0) {
+          const cloudTexts = result.data.map(function(item) { return item.text; });
+          blessings = [...defaultBlessings, ...cloudTexts];
+          console.log('☁️ 已从云端加载 ' + cloudTexts.length + ' 条祝福语');
+        }
+      }
+    } catch (error) {
+      console.warn('云端祝福语加载失败，使用预设祝福语:', error);
+    }
+  }
+  
+  // 发送祝福语到云端
+  async function saveToCloud(text) {
+    if (!API_URL) return;
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, name: '来宾' })
+      });
+      console.log('☁️ 祝福语已保存到云端');
+    } catch (error) {
+      console.warn('祝福语保存到云端失败:', error);
+    }
+  }
+  
+  // 初始化：先加载云端数据，再启动弹幕
+  loadCloudBlessings().then(function() {
+    // 随机打乱顺序
+    var shuffled = [...blessings];
+    for (var i = shuffled.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var temp = shuffled[i];
+      shuffled[i] = shuffled[j];
+      shuffled[j] = temp;
+    }
+    // 初始显示前10条
+    shuffled.slice(0, 10).forEach(function(blessing, index) {
+      setTimeout(function() {
+        createDanmaku(blessing);
+      }, index * 1200);
+    });
   });
   
   // 发送祝福语
   sendBlessingBtn.addEventListener('click', function() {
-    const blessingText = blessingInput.value.trim();
+    var blessingText = blessingInput.value.trim();
     if (blessingText) {
       // 添加到祝福语数组
       blessings.push(blessingText);
+      
+      // 保存到云端
+      saveToCloud(blessingText);
       
       // 创建弹幕
       createDanmaku(blessingText);
@@ -739,11 +804,35 @@ function initializeBlessingSystem() {
     }
   });
   
+  // 定时轮询：每15秒从服务器拉取新祝福语
+  var lastKnownCount = blessings.length;
+  setInterval(function() {
+    if (!API_URL) return;
+    fetch(API_URL).then(function(response) {
+      return response.ok ? response.json() : null;
+    }).then(function(result) {
+      if (result && result.success && result.data && result.data.length > 0) {
+        var cloudTexts = result.data.map(function(item) { return item.text; });
+        var newBlessings = [...defaultBlessings, ...cloudTexts];
+        if (newBlessings.length > lastKnownCount) {
+          // 有新祝福语，立即显示新增的
+          var newItems = newBlessings.slice(lastKnownCount);
+          newItems.forEach(function(text, i) {
+            setTimeout(function() { createDanmaku(text); }, i * 800);
+          });
+          console.log('🆕 收到 ' + newItems.length + ' 条新祝福语');
+        }
+        blessings = newBlessings;
+        lastKnownCount = blessings.length;
+      }
+    }).catch(function() {});
+  }, 8000);
+  
   // 自动循环播放弹幕
-  let danmakuIndex = 0;
-  setInterval(() => {
+  var danmakuIndex = 0;
+  setInterval(function() {
     if (blessings.length > 0) {
-      const blessing = blessings[danmakuIndex % blessings.length];
+      var blessing = blessings[danmakuIndex % blessings.length];
       createDanmaku(blessing);
       danmakuIndex++;
     }
@@ -751,36 +840,36 @@ function initializeBlessingSystem() {
   
   // 创建弹幕
   function createDanmaku(text) {
-    const danmaku = document.createElement('div');
+    var danmaku = document.createElement('div');
     danmaku.className = 'danmaku-item';
     danmaku.textContent = text;
     
     // 随机位置（垂直方向）
-    const containerHeight = danmakuContainer.offsetHeight;
-    const danmakuHeight = 40; // 估计的弹幕高度
-    const top = Math.random() * (containerHeight - danmakuHeight);
-    danmaku.style.top = `${top}px`;
+    var containerHeight = danmakuContainer.offsetHeight;
+    var danmakuHeight = 40;
+    var top = Math.random() * (containerHeight - danmakuHeight);
+    danmaku.style.top = top + 'px';
     
     // 随机速度（8-15秒）
-    const duration = 8 + Math.random() * 7;
-    danmaku.style.animationDuration = `${duration}s`;
+    var duration = 8 + Math.random() * 7;
+    danmaku.style.animationDuration = duration + 's';
     
     // 随机颜色
-    const colors = [
-      'rgba(255, 215, 0, 0.8)',  // 金色
-      'rgba(255, 105, 180, 0.8)', // 粉色
-      'rgba(144, 238, 144, 0.8)', // 浅绿色
-      'rgba(135, 206, 235, 0.8)', // 浅蓝色
-      'rgba(255, 165, 0, 0.8)'     // 橙色
+    var colors = [
+      'rgba(255, 215, 0, 0.8)',
+      'rgba(255, 105, 180, 0.8)',
+      'rgba(144, 238, 144, 0.8)',
+      'rgba(135, 206, 235, 0.8)',
+      'rgba(255, 165, 0, 0.8)'
     ];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    var randomColor = colors[Math.floor(Math.random() * colors.length)];
     danmaku.style.background = randomColor;
     
     // 添加到容器
     danmakuContainer.appendChild(danmaku);
     
     // 动画结束后移除
-    setTimeout(() => {
+    setTimeout(function() {
       danmaku.remove();
     }, duration * 1000);
   }

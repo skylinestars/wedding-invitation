@@ -40,6 +40,10 @@ const weddingConfig = {
     url: 'https://your-domain.com/index.html'  // 需要替换为实际的部署URL
   },
   
+  // ========== 祝福语API配置 ==========
+  // PHP API，与网站部署在同一服务器，国内直接访问
+  blessingApi: './api/blessings.php',
+  
   // ========== 联系方式（可选） ==========
   contact: {
     phone: '17889846353',  // 联系电话（选填）
