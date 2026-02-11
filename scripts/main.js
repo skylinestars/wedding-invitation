@@ -336,7 +336,14 @@ function initializeMusicControl() {
   // 添加多种交互事件监听器
   document.addEventListener('click', handleUserInteraction);
   document.addEventListener('touchstart', handleUserInteraction);
+  document.addEventListener('touchend', handleUserInteraction);
   document.addEventListener('keydown', handleUserInteraction);
+  
+  // 监听 Swiper 滑动作为用户交互（微信中滑动是最常见的首次交互）
+  if (window.weddingSwiper) {
+    window.weddingSwiper.on('slideChange', handleUserInteraction);
+    window.weddingSwiper.on('touchStart', handleUserInteraction);
+  }
   
   // 尝试播放音乐（不强制重新加载）
   function tryPlayMusic() {

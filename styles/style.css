@@ -593,6 +593,7 @@ body {
   z-index: 11;
   animation: slideInFromTop 1s ease-out forwards;
   opacity: 0;
+  pointer-events: none;
 }
 
 .decoration-top img {
